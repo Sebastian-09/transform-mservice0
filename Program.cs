@@ -1,5 +1,7 @@
+
 using Microsoft.OpenApi.Models;
 using TransformService.Services;
+using TransformService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,22 +20,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapPost("/api/transform/factorize", (Dictionary<string, List<string>> grammar, GrammarTransformer transformer) =>
+app.MapPost("/api/transform/factorize", (Grammar grammar, GrammarTransformer transformer) =>
 {
     var result = transformer.Factorize(grammar);
     return Results.Ok(result);
 });
 
-app.MapPost("/api/transform/eliminate-left-recursion", (Dictionary<string, List<string>> grammar, GrammarTransformer transformer) =>
+app.MapPost("/api/transform/eliminate-recursion", (Grammar grammar, GrammarTransformer transformer) =>
 {
     var result = transformer.EliminateLeftRecursion(grammar);
     return Results.Ok(result);
 });
 
-app.MapPost("/api/transform/step-by-step", (Dictionary<string, List<string>> grammar, GrammarTransformer transformer) =>
-{
-    var result = transformer.TransformStepByStep(grammar);
-    return Results.Ok(result);
-});
-
-app.Run("http://localhost:5085");
+app.Run();

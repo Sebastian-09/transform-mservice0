@@ -178,3 +178,53 @@ namespace TransformService.Services
         }
     }
 }
+
+
+
+using TransformService.Models;
+
+namespace TransformService.Services
+{
+    public partial class GrammarTransformer
+    {
+        public Grammar Factorize(Grammar grammar)
+        {
+            var dict = ToDictionary(grammar);
+            var transformed = Factorize(dict);
+            return FromDictionary(transformed, grammar.StartSymbol);
+        }
+
+        public Grammar EliminateLeftRecursion(Grammar grammar)
+        {
+            var dict = ToDictionary(grammar);
+            var transformed = EliminateLeftRecursion(dict);
+            return FromDictionary(transformed, grammar.StartSymbol);
+        }
+
+        private Dictionary<string, List<string>> ToDictionary(Grammar grammar)
+        {
+            var dict = new Dictionary<string, List<string>>();
+            foreach (var prod in grammar.Productions)
+            {
+                var parts = prod.RightSide.Split('|', StringSplitOptions.TrimEntries);
+                if (!dict.ContainsKey(prod.NonTerminal))
+                    dict[prod.NonTerminal] = new List<string>();
+                dict[prod.NonTerminal].AddRange(parts);
+            }
+            return dict;
+        }
+
+        private Grammar FromDictionary(Dictionary<string, List<string>> dict, string startSymbol)
+        {
+            var g = new Grammar { StartSymbol = startSymbol };
+            foreach (var kv in dict)
+            {
+                foreach (var rhs in kv.Value)
+                {
+                    g.Productions.Add(new Production { NonTerminal = kv.Key, RightSide = rhs });
+                }
+            }
+            return g;
+        }
+    }
+}
