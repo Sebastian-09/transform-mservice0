@@ -1,4 +1,5 @@
 using System.Text;
+using TransformService.Models;
 
 namespace TransformService.Services
 {
@@ -27,104 +28,93 @@ namespace TransformService.Services
             return candidate;
         }
 
-        // ✅ FACTORIZATION CORRECTED (handles longer prefixes)
+        // ✅ FACTORIZATION (maneja prefijos comunes)
         public object Factorize(Dictionary<string, List<string>> grammar)
-{
-    var productions = grammar.ToDictionary(k => k.Key, v => v.Value.Select(s => s.Trim()).ToList());
-    var steps = new List<string>();
-    var existing = new HashSet<string>(productions.Keys);
-
-    foreach (var nt in productions.Keys.ToList())
-    {
-        bool changed;
-        do
         {
-            changed = false;
-            if (!productions.ContainsKey(nt)) break;
+            var productions = grammar.ToDictionary(k => k.Key, v => v.Value.Select(s => s.Trim()).ToList());
+            var steps = new List<string>();
+            var existing = new HashSet<string>(productions.Keys);
 
-            var rhsList = productions[nt];
-            if (rhsList.Count <= 1) break;
-
-            // Convertimos cada producción en lista de tokens
-            var tokenized = rhsList
-                .Select(r => r.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList())
-                .ToList();
-
-            // Buscamos el prefijo más largo común a al menos 2 producciones
-            string bestPrefix = "";
-            List<int> bestGroup = new();
-            int bestLength = 0;
-
-            int maxLen = tokenized.Max(t => t.Count);
-
-            // Intentamos prefijos desde la longitud máxima hacia abajo
-            for (int L = maxLen; L >= 1; L--)
+            foreach (var nt in productions.Keys.ToList())
             {
-                var groups = new Dictionary<string, List<int>>();
-                for (int i = 0; i < tokenized.Count; i++)
+                bool changed;
+                do
                 {
-                    var toks = tokenized[i];
-                    if (toks.Count < L) continue;
-                    var pref = string.Join(' ', toks.Take(L));
-                    if (!groups.ContainsKey(pref))
-                        groups[pref] = new List<int>();
-                    groups[pref].Add(i);
-                }
+                    changed = false;
+                    if (!productions.ContainsKey(nt)) break;
 
-                var candidate = groups
-                    .Where(g => g.Value.Count >= 2)
-                    .OrderByDescending(g => g.Key.Split(' ').Length)
-                    .FirstOrDefault();
+                    var rhsList = productions[nt];
+                    if (rhsList.Count <= 1) break;
 
-                if (!candidate.Equals(default(KeyValuePair<string, List<int>>)))
-                {
-                    bestPrefix = candidate.Key;
-                    bestGroup = candidate.Value;
-                    bestLength = bestPrefix.Split(' ').Length;
-                    break; // rompemos porque encontramos el más largo
-                }
+                    var tokenized = rhsList
+                        .Select(r => r.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList())
+                        .ToList();
+
+                    string bestPrefix = "";
+                    List<int> bestGroup = new();
+                    int bestLength = 0;
+                    int maxLen = tokenized.Max(t => t.Count);
+
+                    for (int L = maxLen; L >= 1; L--)
+                    {
+                        var groups = new Dictionary<string, List<int>>();
+                        for (int i = 0; i < tokenized.Count; i++)
+                        {
+                            var toks = tokenized[i];
+                            if (toks.Count < L) continue;
+                            var pref = string.Join(' ', toks.Take(L));
+                            if (!groups.ContainsKey(pref))
+                                groups[pref] = new List<int>();
+                            groups[pref].Add(i);
+                        }
+
+                        var candidate = groups
+                            .Where(g => g.Value.Count >= 2)
+                            .OrderByDescending(g => g.Key.Split(' ').Length)
+                            .FirstOrDefault();
+
+                        if (!candidate.Equals(default(KeyValuePair<string, List<int>>)))
+                        {
+                            bestPrefix = candidate.Key;
+                            bestGroup = candidate.Value;
+                            bestLength = bestPrefix.Split(' ').Length;
+                            break;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(bestPrefix)) break;
+
+                    var newNT = NewSymbol(nt, existing);
+                    var newList = new List<string>();
+                    var remaining = new List<string>();
+
+                    for (int i = 0; i < tokenized.Count; i++)
+                    {
+                        var toks = tokenized[i];
+                        if (bestGroup.Contains(i))
+                        {
+                            var suffix = toks.Skip(bestLength).ToList();
+                            newList.Add(suffix.Count == 0 ? "ε" : string.Join(' ', suffix));
+                        }
+                        else
+                        {
+                            remaining.Add(string.Join(' ', toks));
+                        }
+                    }
+
+                    remaining.Add($"{bestPrefix} {newNT}".Trim());
+
+                    productions[nt] = remaining;
+                    productions[newNT] = newList;
+
+                    steps.Add($"Factorización aplicada a {nt}: prefijo común '{bestPrefix}' → nuevo no terminal {newNT} con {newList.Count} alternativas.");
+                    changed = true;
+
+                } while (changed);
             }
 
-            // Si no hay prefijo común, terminamos
-            if (string.IsNullOrEmpty(bestPrefix)) break;
-
-            // Creamos el nuevo no terminal
-            var newNT = nt + "'";
-            while (existing.Contains(newNT)) newNT += "'";
-            existing.Add(newNT);
-
-            var newList = new List<string>();
-            var remaining = new List<string>();
-
-            for (int i = 0; i < tokenized.Count; i++)
-            {
-                var toks = tokenized[i];
-                if (bestGroup.Contains(i))
-                {
-                    var suffix = toks.Skip(bestLength).ToList();
-                    newList.Add(suffix.Count == 0 ? "ε" : string.Join(' ', suffix));
-                }
-                else
-                {
-                    remaining.Add(string.Join(' ', toks));
-                }
-            }
-
-            remaining.Add($"{bestPrefix} {newNT}".Trim());
-
-            productions[nt] = remaining;
-            productions[newNT] = newList;
-
-            steps.Add($"Factorización aplicada a {nt}: prefijo común '{bestPrefix}' → nuevo no terminal {newNT} con {newList.Count} alternativas.");
-            changed = true;
-
-        } while (changed);
-    }
-
-    return new { productions, steps };
-}
-
-
+            return new { productions, steps };
+        }
 
         // ✅ LEFT RECURSION REMOVAL (direct only)
         public object EliminateLeftRecursion(Dictionary<string, List<string>> grammar)
@@ -149,7 +139,7 @@ namespace TransformService.Services
 
                 if (alpha.Any())
                 {
-                    string A1 = A + "'";
+                    string A1 = NewSymbol(A, new HashSet<string>(grammar.Keys));
                     result[A] = beta.Select(b => (b == "ε" ? A1 : (b + " " + A1).Trim())).ToList();
                     result[A1] = alpha.Select(a => ((a == "" ? "" : a + " ") + A1).Trim()).ToList();
                     result[A1].Add("ε");
@@ -164,7 +154,7 @@ namespace TransformService.Services
             return new { productions = result, steps };
         }
 
-        // Combined transformation (both processes)
+        // ✅ Combina ambos procesos (para debug)
         public object TransformStepByStep(Dictionary<string, List<string>> grammar)
         {
             var factorized = Factorize(grammar);
@@ -176,17 +166,8 @@ namespace TransformService.Services
                 recursionElimination = noRecursion
             };
         }
-    }
-}
 
-
-
-using TransformService.Models;
-
-namespace TransformService.Services
-{
-    public partial class GrammarTransformer
-    {
+        // 🔄 Soporte del modelo Grammar (para compatibilidad con GrammarService)
         public Grammar Factorize(Grammar grammar)
         {
             var dict = ToDictionary(grammar);
@@ -214,16 +195,22 @@ namespace TransformService.Services
             return dict;
         }
 
-        private Grammar FromDictionary(Dictionary<string, List<string>> dict, string startSymbol)
+        private Grammar FromDictionary(object transformed, string startSymbol)
         {
+            var dictProp = transformed.GetType().GetProperty("productions")?.GetValue(transformed) as Dictionary<string, List<string>>;
             var g = new Grammar { StartSymbol = startSymbol };
-            foreach (var kv in dict)
+
+            if (dictProp != null)
             {
-                foreach (var rhs in kv.Value)
+                foreach (var kv in dictProp)
                 {
-                    g.Productions.Add(new Production { NonTerminal = kv.Key, RightSide = rhs });
+                    foreach (var rhs in kv.Value)
+                    {
+                        g.Productions.Add(new Production { NonTerminal = kv.Key, RightSide = rhs });
+                    }
                 }
             }
+
             return g;
         }
     }
