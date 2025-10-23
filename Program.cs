@@ -1,6 +1,8 @@
 using Microsoft.OpenApi.Models;
 using TransformService.Services;
 
+using Microsoft.AspNetCore.Mvc;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -18,9 +20,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapPost("/api/transform/factorize", (Dictionary<string, List<string>> grammar, GrammarTransformer transformer) =>
+app.MapPost("/api/transform/factorizar", ([FromBody] GrammarRequest request) =>
 {
-    var result = transformer.Factorize(grammar);
+    var transformer = new GrammarTransformer();
+    var result = transformer.Factorize(request.Grammar);
     return Results.Ok(result);
 });
 
